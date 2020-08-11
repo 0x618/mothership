@@ -63,7 +63,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         f.write(b"<body>\n<h2>Upload Result Page</h2>\n")
         f.write(b"<hr>\n")
         if r:
-            f.write(b"<strong>Success:</strong>")
+            f.write(b"<strong>Success: </strong>")
         else:
             f.write(b"<strong>Failed: </strong>")
         f.write(info.encode())
