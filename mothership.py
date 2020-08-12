@@ -5,7 +5,7 @@
 This module builds on BaseHTTPServer by implementing the standard GET
 and HEAD requests in a fairly straightforward manner.
 
-see: https://gist.github.com/UniIsland/3346170
+see: https://github.com/python/cpython/blob/3.8/Lib/http/server.py
 """
  
  
@@ -19,7 +19,6 @@ import mimetypes
 import re
 from io import BytesIO
 
-
  
  
 class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
@@ -32,10 +31,8 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
     -Common tools for client side exploitation (netcat, mimikatz, msfvenom payload generator, etc)
     -platform.js, which detects client browser and OS versions
 
-    
-
-
     """
+
  
     sys_version = ""                            # No fingerprint
     server_version = "Mothership 1.0"           # Working title
@@ -322,10 +319,24 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         '.h': 'text/plain',
         })
 
- 
-def test(HandlerClass = SimpleHTTPRequestHandler,
-         ServerClass = http.server.HTTPServer):
-    http.server.test(HandlerClass, ServerClass)
- 
 if __name__ == '__main__':
-    test()
+    # accept command line args to specify bind address and port
+    import argparse
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-b', '--bind', metavar='ADDR', default='0.0.0.0',
+            help='Specify alternate bind address '
+            '[default: 0.0.0.0]')
+
+    parser.add_argument('port', action='store',
+            default=8000, type=int,
+            nargs='?',
+            help='Specify alternate port [default: 8000]')
+    args = parser.parse_args()
+
+    # run http server using our custom handler class on specified port and address
+    http.server.test(
+            HandlerClass = SimpleHTTPRequestHandler,
+            ServerClass = http.server.HTTPServer,
+            port=args.port,
+            bind=args.bind)
