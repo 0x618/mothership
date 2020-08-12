@@ -8,7 +8,6 @@ and HEAD requests in a fairly straightforward manner.
 see: https://github.com/python/cpython/blob/3.8/Lib/http/server.py
 """
  
- 
 import os
 import posixpath
 import http.server
@@ -18,8 +17,6 @@ import shutil
 import mimetypes
 import re
 from io import BytesIO
-
- 
  
 class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
  
@@ -33,7 +30,6 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
 
     """
 
- 
     sys_version = ""                            # No fingerprint
     server_version = "Mothership 1.0"           # Working title
  
@@ -160,8 +156,21 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         None, in which case the caller has nothing further to do.
 
         """
+
+        # if rhost arg is specified, return 403 to all other hosts for all resources
+        if self.client_address != self.RHOST and self.RHOST != "":
+           self.send_error(403, 'Forbidden') 
+           self.end_headers()
+           return None
+
         path = self.translate_path(self.path)
         f = None
+
+        if '/uploads/' in path or '/uploads' in path:
+            self.send_error(403, 'Forbidden')
+            self.end_headers()
+            return None
+
         if os.path.isdir(path):
             if not self.path.endswith('/'):
                 # redirect browser - doing basically what apache does
@@ -322,9 +331,9 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
 if __name__ == '__main__':
     # accept command line args to specify bind address and port
     import argparse
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Mothership is a lightweight web server based on the built in Python3 http.server module.  By default, it will serve the local directory (much like running 'python3 -m http.server').  Some additional functionality that has been added is that files can be uploaded through the web server to the host machine.  USE WITH CAUTION ON PUBLIC NETWORKS.")
 
-    parser.add_argument('-b', '--bind', metavar='ADDR', default='0.0.0.0',
+    parser.add_argument('-l', '--lhost', metavar='LHOST', default='0.0.0.0',
             help='Specify alternate bind address '
             '[default: 0.0.0.0]')
 
@@ -332,6 +341,10 @@ if __name__ == '__main__':
             default=8000, type=int,
             nargs='?',
             help='Specify alternate port [default: 8000]')
+
+    parser.add_argument('-r', '--rhost', metavar='RHOST', default='',
+            help='Deny all requests except from RHOST.\n'
+            'Useful for when you\'re working in a public lab environment and you don\'t want everyone on the local network to have access to your tools/loot. TODO')
     args = parser.parse_args()
 
     # run http server using our custom handler class on specified port and address
@@ -339,4 +352,4 @@ if __name__ == '__main__':
             HandlerClass = SimpleHTTPRequestHandler,
             ServerClass = http.server.HTTPServer,
             port=args.port,
-            bind=args.bind)
+            bind=args.lhost)
