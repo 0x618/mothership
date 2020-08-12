@@ -91,29 +91,50 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
             return (False, "Content NOT begin with boundary")
         line = self.rfile.readline()
         remainbytes -= len(line)
-        fn = re.findall(r'Content-Disposition.*name="file"; filename="(.*)"', line.decode())
-        if fn[0] == '':
+        fn = re.findall(r'Content-Disposition.*name="file"; filename="(.*)"', line.decode())[0]
+        # check for empty post request
+        if fn == '':
             return (False, "No file selected for upload")
-        print(type(fn))
         path = self.translate_path(self.path) 
-        # write file to 'uploads' dir
-        if os.path.isdir('uploads'):
-            fn = os.path.join(path, 'uploads/' + fn[0])
-        else:
+
+        # check if 'uploads' dir exists, if not, create it in local path
+        if not os.path.isdir('uploads'):
             try:
-                os.mkdir(os.path.join(path, 'uploads'))
                 print('Uploads directory doesn\'t exist, creating it now...')
+                os.mkdir(os.path.join(path, 'uploads'))
+
+            # this error is likely thrown by a lack of permissions in local path, or perhaps a file named 'uploads' alread exists
             except IOError:
-                print('Unable to create uploads directory.  File upload failed')
+                return (False, 'Unable to create uploads directory.  File upload failed')
+
+        # prepend 'uploads' dir to filename to write to uploads directory
+        upload_path = os.path.join('uploads', fn)
+
+        # check if file with same name already exists
+        if os.path.isfile(upload_path):
+            # check how many files of the same name exist; increment a digit (starting at 1) to append to the filename until a unique filename is found
+            dup_count = 1
+            dup_path = upload_path + '.' + str(dup_count)
+            while(True):
+                if os.path.isfile(dup_path):
+                    dup_count += 1
+                    dup_path = upload_path + '.' + str(dup_count)
+                else:
+                    upload_path = dup_path
+                    break
+
         line = self.rfile.readline()
         remainbytes -= len(line)
         line = self.rfile.readline()
         remainbytes -= len(line)
+
+        # try writing to file, return error if unable
         try:
-            out = open(fn, 'wb')
+            out = open(upload_path, 'wb')
         except IOError:
             return (False, "Can't create file to write, do you have permission to write?")
                 
+        # write file
         preline = self.rfile.readline()
         remainbytes -= len(preline)
         while remainbytes > 0:
@@ -125,7 +146,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
                     preline = preline[0:-1]
                 out.write(preline)
                 out.close()
-                return (True, "File '%s' upload success!" % fn)
+                return (True, "'%s' was uploaded successfully." % fn)
             else:
                 out.write(preline)
                 preline = line
@@ -192,7 +213,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         f = BytesIO()
         displaypath = html.escape(urllib.parse.unquote(self.path))
         f.write(b'<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">')
-        f.write(("<html>\n<title>Directory listing for %s</title>\n" % displaypath).encode())
+        f.write(("<html>\n<title>%s</title>\n" % self.server_version).encode())
         f.write(("<body>\n<h2>Directory listing for %s</h2>\n" % displaypath).encode())
         f.write(b"<hr>\n")
         f.write(b"<form ENCTYPE=\"multipart/form-data\" method=\"post\">")
@@ -202,10 +223,19 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         for name in list:
             fullname = os.path.join(path, name)
             displayname = linkname = name
+
+            # Omit hidden files from dir listing
+            if name.startswith('.'):
+                continue
+
             # Append / for directories or @ for symbolic links
+            # and omit 'uploads/' from listing
             if os.path.isdir(fullname):
+                if name == 'uploads':       # no peeking
+                    continue
                 displayname = name + "/"
                 linkname = name + "/"
+
             if os.path.islink(fullname):
                 displayname = name + "@"
                 # Note: a link to a directory displays with @ and links with /
